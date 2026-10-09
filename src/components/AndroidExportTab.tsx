@@ -34,11 +34,11 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: ☕ Setup Java JDK (Temurin 17)
+      - name: ☕ Setup Java JDK (Temurin 21)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: 🟢 Setup Node.js (v22)
         uses: actions/setup-node@v4
