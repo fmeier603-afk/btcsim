@@ -9,10 +9,91 @@ import {
   CheckCircle2,
   Package,
   Sparkles,
-  QrCode,
   Share2,
+  GitBranch,
+  PlayCircle,
+  FileCode,
 } from 'lucide-react';
 import { usePWAInstall } from '../lib/usePWAInstall';
+
+const WORKFLOW_YML = `name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Ermöglicht manuellen Start per Klick
+
+jobs:
+  build-apk:
+    name: Build & Package Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java JDK (Temurin 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🟢 Setup Node.js (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 NPM Dependencies installieren
+        run: |
+          npm ci || npm install
+
+      - name: ⚡ Vite Web App bauen (dist/)
+        run: |
+          npm run build
+
+      - name: 🤖 Capacitor Android initialisieren & synchronisieren
+        run: |
+          if [ ! -d "android" ]; then
+            echo "Erstelle Android Plattform Verzeichnis..."
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: 🔑 Ausführungsrechte für gradlew setzen
+        run: |
+          chmod +x android/gradlew
+
+      - name: 🔨 Android APK kompilieren (assembleDebug)
+        run: |
+          cd android
+          ./gradlew assembleDebug --stacktrace
+
+      - name: 📤 APK als GitHub Artifact hochladen (Download)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CosmicHash-Android-Debug-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30`;
+
+const CAPACITOR_CONFIG = `import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.cosmichash.benchmark',
+  appName: 'Cosmic Hash',
+  webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+  },
+  android: {
+    allowMixedContent: true,
+  },
+};
+
+export default config;`;
 
 export function AndroidExportTab() {
   const { isInstallable, isInstalled, isAndroid, install } = usePWAInstall();
@@ -60,42 +141,153 @@ npx cap open android`;
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
         <div className="flex items-center gap-2 text-xs font-semibold text-amber-400 mb-2">
           <Download className="w-4 h-4" />
-          <span>ANDROID EXPORT & INSTALLATIONS-ANLEITUNG</span>
+          <span>ANDROID EXPORT & GITHUB ACTIONS CI/CD</span>
         </div>
         <h2 className="text-lg sm:text-xl font-bold text-slate-100">
-          Wie exportiere ich diese App auf mein Android-Gerät?
+          Wie baue und exportiere ich die Android APK?
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
-          Es gibt drei einfache Wege: von der sofortigen 1-Klick-Installation
-          direkt auf dem Smartphone bis zur echten <strong>.apk</strong>-Datei
-          mit Android Studio oder PWABuilder.
+          Alle erforderlichen Dateien – einschließlich der{' '}
+          <strong className="text-slate-200">.github/workflows/build-apk.yml</strong>{' '}
+          und der <strong className="text-slate-200">capacitor.config.ts</strong>{' '}
+          – sind bereits in diesem Projekt hinterlegt. GitHub Actions kann die
+          APK vollautomatisch auf Knopfdruck kompilieren!
         </p>
       </div>
 
-      {/* Option 1: Direct PWA Install on Android */}
-      <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-lg shadow-amber-500/5">
+      {/* Primary Highlight: GitHub Actions Workflow */}
+      <div className="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-5 space-y-4 shadow-xl shadow-amber-500/5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-              <Smartphone className="w-5 h-5" />
+            <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300">
+              <GitBranch className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm sm:text-base font-bold text-slate-100">
-                  Weg 1: Direkt auf Android installieren (Sofort)
+                  GitHub Actions: Automatische APK-Erstellung (Cloud Build)
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
-                  0 MINUTEN · KEIN PC NÖTIG
+                  BEREITS IM REPO AKTIV
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Installiert die App als vollwertige Standalone-App mit Icon auf dem Startbildschirm.
+                Baut die APK auf GitHub-Servern ohne Android Studio oder Java auf deinem PC.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Dynamic Install Button or status */}
+        {/* 4 Steps to APK on GitHub */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
+          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
+            <span className="font-mono text-amber-400 font-bold block mb-1">
+              1. Code auf GitHub
+            </span>
+            Pushe dieses Repository auf dein GitHub-Konto.
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
+            <span className="font-mono text-amber-400 font-bold block mb-1">
+              2. Reiter "Actions"
+            </span>
+            Klicke in deinem GitHub-Repo oben auf <strong>Actions</strong>.
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
+            <span className="font-mono text-amber-400 font-bold block mb-1">
+              3. Run Workflow
+            </span>
+            Wähle <strong>Build Android APK</strong> und klicke auf <strong>Run workflow</strong>.
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
+            <span className="font-mono text-emerald-400 font-bold block mb-1">
+              4. APK herunterladen
+            </span>
+            Unter <strong>Artifacts</strong> die fertige APK-Zip herunterladen und aufs Handy laden!
+          </div>
+        </div>
+
+        {/* Workflow YML Code Box */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden mt-3">
+          <div className="bg-slate-900/90 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+            <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+              <FileCode className="w-3.5 h-3.5 text-amber-400" />
+              <span>.github/workflows/build-apk.yml (Fertig angelegt)</span>
+            </span>
+            <button
+              onClick={() => copyText(WORKFLOW_YML, 99)}
+              className="flex items-center gap-1 text-xs text-amber-400 hover:underline"
+            >
+              {copiedIndex === 99 ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400">Kopiert!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Workflow kopieren</span>
+                </>
+              )}
+            </button>
+          </div>
+          <div className="p-4 font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto max-h-72">
+            <pre>{WORKFLOW_YML}</pre>
+          </div>
+        </div>
+      </div>
+
+      {/* Capacitor Config Code Box */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-sky-400" />
+            <span className="text-sm font-bold text-slate-200">
+              capacitor.config.ts (Capacitor-Konfiguration)
+            </span>
+          </div>
+          <button
+            onClick={() => copyText(CAPACITOR_CONFIG, 98)}
+            className="flex items-center gap-1 text-xs text-amber-400 hover:underline"
+          >
+            {copiedIndex === 98 ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-400" />
+                <span className="text-emerald-400">Kopiert!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Kopieren</span>
+              </>
+            )}
+          </button>
+        </div>
+        <div className="p-4 font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto bg-slate-950 border border-slate-800 rounded-xl">
+          <pre>{CAPACITOR_CONFIG}</pre>
+        </div>
+      </div>
+
+      {/* Alternative 1: Direct PWA Install on Android */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+            <Smartphone className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm sm:text-base font-bold text-slate-100">
+                Alternative: Sofortige PWA-Installation auf Android
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                OHNE GITHUB · 0 MINUTEN
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Installiert die App direkt aus dem mobilen Chrome auf dem Homescreen.
+            </p>
+          </div>
+        </div>
+
         <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="text-xs font-semibold text-slate-200">
@@ -103,10 +295,10 @@ npx cap open android`;
                 ? 'App ist bereits auf diesem Gerät installiert!'
                 : isInstallable
                 ? 'Installation für dieses Gerät bereit!'
-                : 'Im mobilen Browser öffnen:'}
+                : 'Im mobilen Browser aufrufen:'}
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Läuft nativ im Vollbild ohne störende Chrome-Adressleiste.
+              Öffne die Web-URL in Chrome auf Android &gt; Drei Punkte (⋮) &gt; App installieren.
             </p>
           </div>
 
@@ -126,138 +318,22 @@ npx cap open android`;
               className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-medium transition-colors"
             >
               <Share2 className="w-3.5 h-3.5 text-amber-400" />
-              <span>Link teilen / Handy öffnen</span>
+              <span>Link teilen</span>
             </button>
-          </div>
-        </div>
-
-        {/* Steps for Chrome on Android */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs text-slate-300">
-          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
-            <span className="font-mono text-amber-400 font-bold block mb-1">
-              Schritt 1
-            </span>
-            Öffne diese URL im <strong>Google Chrome Browser</strong> auf deinem
-            Android-Smartphone.
-          </div>
-          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
-            <span className="font-mono text-amber-400 font-bold block mb-1">
-              Schritt 2
-            </span>
-            Tippe oben rechts auf das <strong>Drei-Punkte-Menü (⋮)</strong> in Chrome.
-          </div>
-          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3">
-            <span className="font-mono text-amber-400 font-bold block mb-1">
-              Schritt 3
-            </span>
-            Wähle <strong>„App installieren“</strong> oder „Zum Startbildschirm hinzufügen“.
           </div>
         </div>
       </div>
 
-      {/* Option 2: Capacitor to Native APK */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400">
-            <Package className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-bold text-slate-100">
-                Weg 2: Als echte Android .APK kompilieren (Capacitor)
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-semibold">
-                NATIVE .APK / .AAB DATEI
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Erzeugt ein vollständiges Android Studio Projekt zum Bauen einer installierbaren APK.
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="bg-slate-900/80 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
-            <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
-              <Terminal className="w-3.5 h-3.5 text-sky-400" />
-              <span>Terminal-Befehle im Projektordner:</span>
-            </span>
-            <button
-              onClick={() => copyText(CAPACITOR_COMMANDS, 1)}
-              className="flex items-center gap-1 text-xs text-amber-400 hover:underline"
-            >
-              {copiedIndex === 1 ? (
-                <>
-                  <Check className="w-3 h-3 text-emerald-400" />
-                  <span className="text-emerald-400">Kopiert!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  <span>Kopieren</span>
-                </>
-              )}
-            </button>
-          </div>
-          <div className="p-4 font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto">
-            <pre>{CAPACITOR_COMMANDS}</pre>
-          </div>
-        </div>
-
-        <div className="bg-slate-950 border border-slate-800/80 rounded-xl p-3.5 text-xs text-slate-400 space-y-1.5 leading-relaxed">
-          <div className="font-semibold text-slate-200">
-            APK in Android Studio exportieren:
-          </div>
-          <ol className="list-decimal list-inside space-y-1 text-slate-300">
-            <li>Sobald Android Studio sich öffnet, lasse das Gradle-Projekt synchronisieren.</li>
-            <li>
-              Klicke im Menü auf <strong>Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</strong>.
-            </li>
-            <li>
-              Nach dem Build klickst du auf <strong>„locate“</strong> und erhältst deine fertige{' '}
-              <code className="text-amber-300 font-mono">app-debug.apk</code>, die du direkt per USB oder WhatsApp/Telegram auf jedem Android-Handy installieren kannst!
-            </li>
-          </ol>
-        </div>
-      </div>
-
-      {/* Option 3: PWABuilder (Online Tool to APK) */}
+      {/* Alternative 2: Local Android Studio Build */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-sm sm:text-base font-bold text-slate-100">
-              Weg 3: Mit PWABuilder online ohne Android Studio
-            </span>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Offizielles Microsoft-Tool für Google Play Store APK/AAB Generierung.
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-sky-400" />
+          <span className="text-sm font-bold text-slate-200">
+            Lokaler Android Studio Build (Falls gewünscht)
+          </span>
         </div>
-
-        <div className="bg-slate-950 border border-slate-800/80 rounded-xl p-4 text-xs text-slate-300 space-y-2">
-          <p>
-            1. Gehe auf{' '}
-            <a
-              href="https://www.pwabuilder.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-amber-400 underline font-mono"
-            >
-              pwabuilder.com
-            </a>
-            .
-          </p>
-          <p>
-            2. Trage die geteilte URL deiner Web-App ein und klicke auf <strong>Start</strong>.
-          </p>
-          <p>
-            3. Klicke auf <strong>„Package for Android“</strong>. PWABuilder generiert
-            automatisch eine fertige signierte APK sowie die Dateien für den
-            Google Play Store!
-          </p>
+        <div className="p-4 font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto bg-slate-950 border border-slate-800 rounded-xl">
+          <pre>{CAPACITOR_COMMANDS}</pre>
         </div>
       </div>
     </div>
