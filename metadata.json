@@ -1,0 +1,6 @@
+{
+  "name": "Cosmic Hash - Bitcoin Key Benchmark",
+  "description": "Android-style Benchmark App demonstrating the mathematical impossibility of brute-forcing 256-bit Bitcoin keys compared to the volume of the observable universe.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
